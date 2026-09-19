@@ -1,0 +1,182 @@
+/* Shortify — token layer.  See DESIGN.md.
+   Sibling to Ferry: same cool-graphite instrument ground, different accent.
+   Neutrals carry blue temperature; nothing here is a neutral grey. */
+
+@define-color ground        #14181d;
+@define-color ground_raised #1b2027;
+@define-color ground_sunk   #0f1216;
+@define-color rule          #2a313a;
+@define-color rule_strong   #3a434f;
+
+@define-color ink           #e6ebf1;
+@define-color ink_dim       #97a3b2;
+@define-color ink_faint     #63707f;
+
+/* THE accent: the literal yellow this app paints onto video */
+@define-color signal        #ffd400;
+@define-color signal_dim    #7a6600;
+
+@define-color drift         #d8a657;   /* timing suspicious */
+@define-color edited        #5ad19a;   /* corrected by hand */
+@define-color failed        #e26d6d;
+
+/* ---------- shell ---------- */
+
+window.shortify, .sf-root { background: @ground; color: @ink; }
+
+/* ---------- header ---------- */
+
+.sf-header {
+  background: @ground_raised;
+  border-bottom: 1px solid @rule_strong;
+  padding: 12px 20px 10px 20px;
+}
+
+.sf-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.sf-sub {
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.9px;
+  color: @ink_dim;
+}
+
+.sf-file {
+  font-size: 13px;
+  font-weight: 500;
+  color: @ink_dim;
+}
+
+/* ---------- the ledger: word rows, no cards, radius 0 ---------- */
+
+.sf-ledger { background: @ground; }
+
+row.sf-row {
+  border-bottom: 1px solid @rule;
+  padding: 5px 16px;
+  background: transparent;
+}
+row.sf-row:selected { background: @ground_raised; }
+
+.sf-word {
+  font-size: 15px;
+  font-weight: 600;
+  color: @ink;
+}
+.sf-word-edited { color: @edited; }
+
+.sf-time {
+  font-family: "Ubuntu Mono", "DejaVu Sans Mono", monospace;
+  font-size: 12px;
+  color: @ink_faint;
+  letter-spacing: 0.4px;
+}
+
+entry.sf-edit {
+  background: @ground_sunk;
+  color: @ink;
+  border: 1px solid @signal_dim;
+  border-radius: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 2px 6px;
+}
+
+/* ---------- panel: preview + controls ---------- */
+
+.sf-panel {
+  background: @ground_raised;
+  border-left: 1px solid @rule_strong;
+  padding: 12px 16px;
+}
+
+.sf-preview {
+  background: @ground_sunk;
+  border-radius: 2px;
+}
+
+.sf-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.9px;
+  color: @ink_dim;
+}
+
+.sf-value {
+  font-family: "Ubuntu Mono", "DejaVu Sans Mono", monospace;
+  font-size: 12px;
+  color: @signal;
+}
+
+/* ---------- the ribbon: signature move ---------- */
+
+.sf-ribbon {
+  background: @ground_sunk;
+  border-top: 1px solid @rule_strong;
+  border-bottom: 1px solid @rule;
+}
+
+/* ---------- controls: tone not borders, 4px ---------- */
+
+scale trough { background: @rule; border-radius: 2px; min-height: 4px; }
+scale highlight { background: @signal_dim; border-radius: 2px; min-height: 4px; }
+scale slider {
+  background: @ink_dim;
+  border-radius: 50%;
+  min-width: 14px;
+  min-height: 14px;
+  margin: -6px;
+}
+scale:hover slider { background: @signal; }
+
+progressbar trough { background: @rule; border: none; border-radius: 2px; min-height: 6px; }
+progressbar progress { background: @signal; border: none; border-radius: 2px; min-height: 6px; }
+
+.sf-bar {
+  background: @ground_raised;
+  border-top: 1px solid @rule_strong;
+  padding: 9px 18px;
+}
+
+button.sf-btn {
+  background: @rule;
+  color: @ink;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  min-height: 30px;
+}
+button.sf-btn:hover    { background: @rule_strong; }
+button.sf-btn:disabled { color: @ink_faint; background: @ground_raised; }
+
+button.sf-primary {
+  background: @signal;
+  color: #141005;
+  font-weight: 700;
+}
+button.sf-primary:hover    { background: #ffe14d; }
+button.sf-primary:disabled { background: @rule; color: @ink_faint; }
+
+.sf-status { font-size: 12px; color: @ink_dim; }
+.sf-status-work { color: @signal; }
+.sf-status-fail { color: @failed; }
+
+/* ---------- empty state: drop target, not an empty ribbon ---------- */
+
+.sf-drop {
+  border: 2px dashed @rule_strong;
+  border-radius: 4px;
+  background: @ground_sunk;
+}
+.sf-drop-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: @ink_dim;
+}
+.sf-drop-sub { font-size: 12px; color: @ink_faint; }

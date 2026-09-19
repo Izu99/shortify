@@ -1,0 +1,22 @@
+# Terms you use often. One per line. These prime the recogniser so it
+# expects them. Add your recurring tech/channel vocabulary here.
+# --- tech / channel ---
+Claude Code
+Anthropic
+TypeScript
+Next.js
+Tailwind
+PostgreSQL
+Supabase
+API endpoint
+LLM
+repository
+framework
+# --- Sri Lankan place names ---
+Pidurutalagala
+Sigiriya
+Dambulla
+Minneriya
+Wilpattu
+Anuradhapura
+Polonnaruwa

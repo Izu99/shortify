@@ -1,0 +1,15 @@
+# Hard replacements applied after transcription: wrong => right
+# Case-insensitive, whole word, trailing punctuation preserved.
+# Multi-word allowed when both sides have the same number of words.
+Sigiria => Sigiriya
+Mineria => Minneriya
+Mineraya => Minneriya
+Wilpatu => Wilpattu
+Pududutalagala => Pidurutalagala
+Dambala's => Dambulla's
+trained journeys => train journeys
+irrigation marbles => irrigation marvels
+tier states => tea estates
+Eachers span => Beaches span
+Features span => Beaches span
+for highest => its highest

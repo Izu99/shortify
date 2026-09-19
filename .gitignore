@@ -1,0 +1,26 @@
+# whisper.cpp is cloned + built locally by setup.sh (209 MB, incl. model weights)
+whisper.cpp/
+
+# transcription + render artefacts
+*.words.json
+*.ass
+*.16k.wav
+*.16k.json
+*.captioned.mp4
+
+# media
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.m4v
+*.png
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# keep documentation images
+!docs/*.png
