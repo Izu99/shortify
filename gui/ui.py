@@ -97,6 +97,7 @@ class Shortify(Gtk.Window):
         self.busy = False
         self.proc = None
         self.cur = -1
+        self.script = ""
         self._ready = False
         self.tmp = Path(tempfile.mkdtemp(prefix="shortify-"))
         self.cfgv = self._load_settings()
@@ -397,6 +398,13 @@ class Shortify(Gtk.Window):
         self.btn_burn.set_sensitive(False)
         b.pack_end(self.btn_burn, False, False, 0)
 
+        self.btn_script = klass(Gtk.Button(label="Script…"), "sf-btn")
+        self.btn_script.set_tooltip_text("Paste exactly what is said. Words come from "
+                                         "your script, timing from the audio — ideal "
+                                         "when the voice is TTS.")
+        self.btn_script.connect("clicked", lambda *_: self._script_dialog())
+        b.pack_end(self.btn_script, False, False, 0)
+
         self.btn_tr = klass(Gtk.Button(label="Transcribe"), "sf-btn")
         self.btn_tr.connect("clicked", lambda *_: self._transcribe())
         self.btn_tr.set_sensitive(False)
@@ -478,6 +486,8 @@ class Shortify(Gtk.Window):
             self._say(f"Cannot read that file: {e}", "sf-status-fail")
             return
         self.filelbl.set_text(os.path.basename(path))
+        sp = Path(str(Path(path).with_suffix("")) + ".script.txt")
+        self.script = sp.read_text().strip() if sp.exists() else ""
         self.editlabel.set_text("SAMPLE WORD")
         self.editinfo.set_text("a stand-in so you can set the style before transcribing")
         self.edit.set_text(self.cfgv.get("sample", "Sri Lanka"))
@@ -543,6 +553,8 @@ class Shortify(Gtk.Window):
         threading.Thread(target=work, daemon=True).start()
 
     def _transcribed(self, words):
+        if self.script:
+            words = engine.align_script(words, self.script)
         self.words = mark_drift(words)
         self.originals = {}
         self.list.foreach(lambda c: self.list.remove(c))
@@ -627,6 +639,74 @@ class Shortify(Gtk.Window):
             self.cfgv["sample"] = self.edit.get_text()
             self._save_settings()
             self._queue_preview()
+
+    def _script_dialog(self):
+        d = Gtk.Dialog(title="Script — what is actually said", parent=self, modal=True)
+        d.add_buttons("Cancel", Gtk.ResponseType.CANCEL,
+                      "Load file…", 42,
+                      "Apply", Gtk.ResponseType.OK)
+        d.set_default_size(620, 380)
+        box = d.get_content_area()
+        box.set_spacing(8)
+        box.set_border_width(12)
+        box.pack_start(klass(Gtk.Label(
+            label="Paste your script. The words below become the captions; the audio is "
+                  "used only for timing.\nBest when the voice-over is TTS — the spelling "
+                  "is then exactly what you typed.", xalign=0), "sf-drop-sub"), False, False, 0)
+        sw = Gtk.ScrolledWindow()
+        sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        tv = Gtk.TextView()
+        tv.set_wrap_mode(Gtk.WrapMode.WORD)
+        tv.get_buffer().set_text(self.script)
+        sw.add(tv)
+        box.pack_start(sw, True, True, 0)
+        d.show_all()
+
+        while True:
+            resp = d.run()
+            if resp == 42:
+                fc = Gtk.FileChooserDialog(title="Open script", parent=d,
+                                           action=Gtk.FileChooserAction.OPEN)
+                fc.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Open", Gtk.ResponseType.OK)
+                if fc.run() == Gtk.ResponseType.OK:
+                    try:
+                        tv.get_buffer().set_text(open(fc.get_filename()).read())
+                    except Exception as e:
+                        self._say(f"Could not read that file: {e}", "sf-status-fail")
+                fc.destroy()
+                continue
+            break
+
+        if resp == Gtk.ResponseType.OK:
+            buf = tv.get_buffer()
+            self.script = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), True).strip()
+            self._apply_script()
+        d.destroy()
+
+    def _apply_script(self):
+        if not self.script:
+            return
+        if self.video:
+            try:
+                Path(str(Path(self.video).with_suffix("")) + ".script.txt").write_text(self.script)
+            except Exception:
+                pass
+        if not self.words:
+            self._say("Script saved — press Transcribe and it will be applied automatically")
+            return
+        before = len(self.words)
+        self.words = mark_drift(engine.align_script(self.words, self.script))
+        self.originals = {}
+        self.list.foreach(lambda c: self.list.remove(c))
+        for i, w in enumerate(self.words):
+            self.list.add(WordRow(i, w))
+        self.list.show_all()
+        self.ribbon.load(self.words, self.duration, self.sliders["offset"].get_value())
+        self._lock(False)
+        self._say(f"Aligned to your script — {before} recognised words replaced by "
+                  f"{len(self.words)} script words, timing kept")
+        if self.words:
+            self._pick(0)
 
     def _save_fixes(self):
         path = ROOT / "fixes.txt"

@@ -130,6 +130,73 @@ def duration(video):
     return float(out or 0)
 
 
+
+def _norm(t):
+    return re.sub(r"[^\w']", "", t).lower()
+
+
+def align_script(words, script):
+    """Replace recognised words with the true script, keeping Whisper's timing.
+
+    When the audio came from TTS, the script is ground truth and the recogniser
+    is only useful for *when* each word is spoken. Aligning the two sequences
+    gives perfectly spelled captions with real timings, and removes any need for
+    vocab priming or spelling fixes on that video.
+    """
+    import difflib
+
+    script_words = [w for w in re.split(r"\s+", script.strip()) if w]
+    if not script_words or not words:
+        return words
+
+    a = [_norm(w["text"]) for w in words]
+    b = [_norm(w) for w in script_words]
+    sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
+
+    out = []
+
+    def spread(items, t0, t1):
+        """Lay words across a span, weighted by length so long words hold longer."""
+        span = max(t1 - t0, 0.04 * len(items))
+        weights = [max(len(_norm(x)), 1) for x in items]
+        total = float(sum(weights))
+        t = t0
+        for w, wt in zip(items, weights):
+            d = span * (wt / total)
+            out.append({"start": round(t, 3), "end": round(t + d, 3), "text": w})
+            t += d
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                out.append({"start": words[i1 + k]["start"],
+                            "end":   words[i1 + k]["end"],
+                            "text":  script_words[j1 + k]})
+        elif tag == "replace":
+            spread(script_words[j1:j2], words[i1]["start"], words[i2 - 1]["end"])
+        elif tag == "delete":
+            continue                      # heard but not in the script -- drop it
+        elif tag == "insert":
+            prev_end = out[-1]["end"] if out else (words[i1]["start"] if i1 < len(words) else 0.0)
+            nxt = words[i1]["start"] if i1 < len(words) else prev_end + 0.4 * (j2 - j1)
+            if nxt - prev_end < 0.12 * (j2 - j1) and i1 < len(words):
+                # no real gap: borrow the front of the next spoken word
+                nxt = words[i1]["start"] + (words[i1]["end"] - words[i1]["start"]) * 0.5
+            spread(script_words[j1:j2], prev_end, max(nxt, prev_end + 0.12 * (j2 - j1)))
+
+    # opcodes already arrive in script order -- never re-sort by time, or a stray
+    # match on a common word drags it out of the sentence it belongs to.
+    for i in range(1, len(out)):
+        if out[i]["start"] < out[i - 1]["start"]:
+            out[i]["start"] = out[i - 1]["start"]
+    for i in range(len(out) - 1):
+        if out[i]["end"] > out[i + 1]["start"]:
+            out[i]["end"] = out[i + 1]["start"]
+        if out[i]["end"] <= out[i]["start"]:
+            out[i]["end"] = out[i]["start"] + 0.06
+    return [w for w in out if w["text"]]
+
+
 def ass_color(hexrgb, alpha=0):
     h = hexrgb.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
@@ -277,6 +344,9 @@ def main():
     p.add_argument("--whisper-bin", default=str(WHISPER_BIN), dest="whisper_bin")
     p.add_argument("--dtw", default="base", help="DTW preset matching the model; '' to disable")
     p.add_argument("--lang", default=None)
+    p.add_argument("--script", default=None,
+                   help="text file of exactly what is said; words come from it, "
+                        "timing from the audio (ideal for TTS voice-overs)")
     p.add_argument("--carry", action="store_true",
                    help="repeat the vocab prompt in every window (stronger, riskier)")
     p.add_argument("--vocab", default=str(HERE / "vocab.txt"),
@@ -333,11 +403,16 @@ def main():
             print(f"[i] priming with {len(prompt.split(','))} vocab terms")
         words = transcribe(wav, args.whisper_bin, args.model, args.lang, args.dtw, prompt, args.carry)
         fixes = load_fixes(args.fixes)
-        if fixes:
+        if fixes and not args.script:
             words = apply_fixes(words, fixes)
             print(f"[i] applied {len(fixes)} spelling fixes")
         json.dump(words, open(wjson, "w"), indent=1)
         print(f"[i] {len(words)} words")
+
+    # the script is ground truth whether the words were just recognised or reused
+    if args.script and os.path.exists(args.script):
+        words = align_script(words, open(args.script).read())
+        print(f"[i] aligned to script: {len(words)} words, spelling from the script")
 
     open(assf, "w").write(build_ass(words, W, H, vars(args)))
     print(f"[i] wrote {assf}")

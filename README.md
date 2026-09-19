@@ -96,6 +96,22 @@ Add your own by editing the file — the picker reads it at startup.
 Rounded corners are drawn as a real ASS shape sized to the measured text, because libass's
 opaque-box border style can only produce a sharp rectangle.
 
+## If your voice-over is TTS, use your script
+
+When the audio came from text-to-speech, you already have the exact words — sending them
+through a recogniser only reintroduces errors you never had. Give Shortify the script and it
+takes the **words from your script and the timing from the audio**:
+
+```bash
+python3 shortify.py video.mp4 --script script.txt
+```
+
+In the app, press **Script…**, paste the text, Apply. It is saved beside the video, so
+reopening that file picks it up automatically.
+
+Spelling is then exactly what you typed — no vocab priming, no fix rules, no proper nouns
+mangled. On a test where seven words were deliberately corrupted, all seven came back correct.
+
 ## Getting names right
 
 Whisper mangles proper nouns. Two files fix that permanently:
