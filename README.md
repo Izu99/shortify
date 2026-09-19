@@ -25,7 +25,17 @@ Needs `ffmpeg`, `python3`, `python3-gi` (GTK 3) and a C++ toolchain.
 ```bash
 git clone https://github.com/<you>/shortify.git
 cd shortify
-./setup.sh          # builds whisper.cpp, downloads the base model (~190 MB, once)
+./setup.sh            # builds whisper.cpp, downloads the base model (~190 MB, once)
+./install.sh          # per-user install: no root, nothing outside $HOME
+```
+
+`install.sh` adds a `shortify` command, a menu entry under Sound & Video, and icons.
+It runs the app straight from the source tree, so `git pull` updates it with no reinstall.
+`./install.sh --uninstall` removes everything it added and leaves your settings alone.
+
+To skip installing and just run it:
+
+```bash
 python3 gui/ui.py
 ```
 

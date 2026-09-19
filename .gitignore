@@ -24,3 +24,4 @@ __pycache__/
 
 # keep documentation images
 !docs/*.png
+!packaging/icons/*.png
