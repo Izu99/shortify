@@ -148,16 +148,65 @@ def esc(t):
     return t.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
 
 
+def _measure(font, size, text):
+    """Width/height of a word, so the box behind it can be drawn to fit.
+
+    libass renders through fontconfig+freetype; cairo's toy API uses the same
+    stack, so the numbers line up closely enough that padding absorbs the rest.
+    """
+    try:
+        import cairo
+        surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, 8, 8)
+        cr = cairo.Context(surf)
+        cr.select_font_face(font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        cr.set_font_size(size)
+        adv = cr.text_extents(text).x_advance
+        ascent, descent = cr.font_extents()[0], cr.font_extents()[1]
+        return adv, ascent + descent
+    except Exception:
+        # crude fallback: average advance of a bold sans is ~0.58em
+        return len(text) * size * 0.58, size * 1.25
+
+
+def _round_rect(w, h, r):
+    """ASS drawing for a rounded rectangle with its top-left at the origin.
+
+    libass positions a drawing under \\an5 by shifting it half its own width and
+    height, as though the path grew right and down from the origin -- so the path
+    must start at (0,0), not be pre-centred, or it lands a full box off-target.
+    """
+    r = max(0.0, min(r, w / 2.0, h / 2.0))
+    k = r * 0.55228            # circular-arc bezier constant
+    L, R, T, B = 0.0, w, 0.0, h
+    if r <= 0.5:
+        return f"m {L:.0f} {T:.0f} l {R:.0f} {T:.0f} {R:.0f} {B:.0f} {L:.0f} {B:.0f}"
+    return (
+        f"m {L + r:.0f} {T:.0f} "
+        f"l {R - r:.0f} {T:.0f} "
+        f"b {R - r + k:.0f} {T:.0f} {R:.0f} {T + r - k:.0f} {R:.0f} {T + r:.0f} "
+        f"l {R:.0f} {B - r:.0f} "
+        f"b {R:.0f} {B - r + k:.0f} {R - r + k:.0f} {B:.0f} {R - r:.0f} {B:.0f} "
+        f"l {L + r:.0f} {B:.0f} "
+        f"b {L + r - k:.0f} {B:.0f} {L:.0f} {B - r + k:.0f} {L:.0f} {B - r:.0f} "
+        f"l {L:.0f} {T + r:.0f} "
+        f"b {L:.0f} {T + r - k:.0f} {L + r - k:.0f} {T:.0f} {L + r:.0f} {T:.0f}"
+    )
+
+
 def build_ass(words, W, H, cfg):
     fs      = cfg["fontsize"] or max(24, int(H * cfg["fontscale"]))
-    bord    = max(2, int(fs * 0.10))     # black outline around the letters
-    pad     = max(4, int(fs * 0.16))     # yellow box padding
+    bord    = max(2, int(fs * 0.10))
+    padx    = max(4, int(fs * 0.24))
+    pady    = max(3, int(fs * 0.14))
     marginv = cfg["marginv"] or int(H * cfg["marginscale"])
+    font    = cfg["font"]
+
     textc   = ass_color(cfg.get("textcolor", "FFFFFF"))
     borderc = ass_color(cfg.get("bordercolor", "000000"))
-    boxc    = ass_color(cfg["boxcolor"])
     shadowc = ass_color("000000")
-    font    = cfg["font"]
+    box_rgb = cfg["boxcolor"].lstrip("#")
+    box_a   = int(round((1.0 - cfg.get("boxopacity", 100) / 100.0) * 255))
+    radius  = float(cfg.get("boxradius", 0))
 
     head = f"""[Script Info]
 ScriptType: v4.00+
@@ -169,8 +218,8 @@ YCbCr Matrix: TV.709
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Box,{font},{fs},{textc},{textc},{boxc},{shadowc},-1,0,0,0,100,100,0,0,3,{pad},0,2,40,40,{marginv},1
-Style: Text,{font},{fs},{textc},{textc},{borderc},{shadowc},-1,0,0,0,100,100,0,0,1,{bord},0,2,40,40,{marginv},1
+Style: Box,{font},{fs},{textc},{textc},{shadowc},{shadowc},-1,0,0,0,100,100,0,0,1,0,0,5,20,20,20,1
+Style: Text,{font},{fs},{textc},{textc},{borderc},{shadowc},-1,0,0,0,100,100,0,0,1,{bord},0,5,20,20,20,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -190,6 +239,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             txt = txt.upper()
         if not txt:
             continue
+
         start, end = w["start"] + cfg["offset"], w["end"] + cfg["offset"]
         nxt = (words[i + 1]["start"] + cfg["offset"]) if i + 1 < n else None
         end += cfg["hold"]
@@ -199,9 +249,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             end = min(end, nxt)
             if end <= start:
                 end = start + 0.08
+
+        tw, th = _measure(font, fs, txt)
+        bw, bh = tw + 2 * padx, th + 2 * pady
+        cx = W / 2.0
+        cy = H - marginv - bh / 2.0
+        r_px = radius / 100.0 * (bh / 2.0)
+
         t = esc(txt)
-        lines.append(f"Dialogue: 0,{ts(start)},{ts(end)},Box,,0,0,0,,{{\\1a&HFF&{anim}}}{t}")
-        lines.append(f"Dialogue: 1,{ts(start)},{ts(end)},Text,,0,0,0,,{{{anim}}}{t}")
+        pos = f"\\an5\\pos({cx:.0f},{cy:.0f})"
+        if box_a < 255:
+            shape = _round_rect(bw, bh, r_px)
+            lines.append(
+                f"Dialogue: 0,{ts(start)},{ts(end)},Box,,0,0,0,,"
+                f"{{{pos}\\1c&H{box_rgb[4:6]}{box_rgb[2:4]}{box_rgb[0:2]}&"
+                f"\\1a&H{box_a:02X}&\\bord0\\shad0{anim}\\p1}}{shape}{{\\p0}}")
+        lines.append(f"Dialogue: 1,{ts(start)},{ts(end)},Text,,0,0,0,,"
+                     f"{{{pos}{anim}}}{t}")
     return head + "\n".join(lines) + "\n"
 
 
@@ -231,6 +295,10 @@ def main():
     p.add_argument("--boxcolor", default="FFD400", help="box fill, hex RGB")
     p.add_argument("--textcolor", default="FFFFFF", help="letter fill, hex RGB")
     p.add_argument("--bordercolor", default="000000", help="letter outline, hex RGB")
+    p.add_argument("--boxradius", type=float, default=0,
+                   help="corner rounding, 0-100%% of half the box height (100 = pill)")
+    p.add_argument("--boxopacity", type=float, default=100,
+                   help="box opacity, 0-100%% (0 hides the box entirely)")
     p.add_argument("--hold", type=float, default=0.35)
     p.add_argument("--min-dur", type=float, default=0.18, dest="min_dur")
     p.add_argument("--pop-from", type=int, default=55, dest="pop_from")

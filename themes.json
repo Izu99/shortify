@@ -1,0 +1,12 @@
+{
+  "Highlight":    {"boxcolor":"FFD400","textcolor":"FFFFFF","bordercolor":"000000","boxradius":0,"boxopacity":100,"fontscale":0.050,"marginscale":0.135,"upper":true},
+  "Rounded":      {"boxcolor":"FFD400","textcolor":"111111","bordercolor":"FFD400","boxradius":35,"boxopacity":100,"fontscale":0.050,"marginscale":0.135,"upper":true},
+  "Pill":         {"boxcolor":"FFFFFF","textcolor":"101418","bordercolor":"FFFFFF","boxradius":100,"boxopacity":100,"fontscale":0.048,"marginscale":0.150,"upper":true},
+  "Outline only": {"boxcolor":"000000","textcolor":"FFFFFF","bordercolor":"000000","boxradius":0,"boxopacity":0,"fontscale":0.060,"marginscale":0.140,"upper":true},
+  "Glass":        {"boxcolor":"000000","textcolor":"FFFFFF","bordercolor":"000000","boxradius":22,"boxopacity":55,"fontscale":0.052,"marginscale":0.140,"upper":true},
+  "Alert":        {"boxcolor":"FF2D2D","textcolor":"FFFFFF","bordercolor":"000000","boxradius":8,"boxopacity":100,"fontscale":0.055,"marginscale":0.140,"upper":true},
+  "Mint":         {"boxcolor":"3DDC97","textcolor":"07281C","bordercolor":"3DDC97","boxradius":30,"boxopacity":100,"fontscale":0.050,"marginscale":0.135,"upper":true},
+  "Ink":          {"boxcolor":"101418","textcolor":"FFD400","bordercolor":"000000","boxradius":6,"boxopacity":92,"fontscale":0.052,"marginscale":0.135,"upper":true},
+  "Sky":          {"boxcolor":"00C2FF","textcolor":"052233","bordercolor":"FFFFFF","boxradius":100,"boxopacity":100,"fontscale":0.050,"marginscale":0.145,"upper":true},
+  "Subtitle":     {"boxcolor":"000000","textcolor":"FFFFFF","bordercolor":"000000","boxradius":4,"boxopacity":70,"fontscale":0.040,"marginscale":0.110,"upper":false}
+}

@@ -13,9 +13,11 @@ import shortify as engine
 from ribbon import Ribbon
 
 CONFIG = Path(os.path.expanduser("~/.config/shortify/settings.json"))
+THEMES = ROOT / "themes.json"
 DEFAULTS = dict(fontscale=0.050, marginscale=0.135, offset=0.100,
                 boxcolor="FFD400", textcolor="FFFFFF", bordercolor="000000",
-                font="Ubuntu Sans", upper=True, sample="Sri Lanka")
+                font="Ubuntu Sans", upper=True, sample="Sri Lanka",
+                boxradius=0, boxopacity=100)
 
 SHORT_WORD = 0.10      # below this, timing is probably a glitch
 LONG_WORD  = 1.60      # above this, the caption hangs
@@ -124,6 +126,36 @@ class Shortify(Gtk.Window):
         except Exception:
             pass
         return v
+
+    def _load_themes(self):
+        try:
+            return json.load(open(THEMES))
+        except Exception:
+            return {}
+
+    def _theme_picked(self, cb):
+        name = cb.get_active_text()
+        theme = self.themes.get(name)
+        if not theme:
+            return
+        self._applying = True          # one preview at the end, not one per widget
+        try:
+            for k in ("fontscale", "marginscale", "boxradius", "boxopacity"):
+                if k in theme:
+                    self.sliders[k].set_value(theme[k])
+                    vl, fmt = self.slabels[k]
+                    vl.set_text(fmt.format(theme[k]))
+            for k in ("textcolor", "bordercolor", "boxcolor"):
+                if k in theme:
+                    self.colors[k].set_rgba(rgba_of(theme[k]))
+            if "font" in theme:
+                self.fontbtn.set_font(theme["font"] + " 12")
+            if "upper" in theme:
+                self.caps.set_active(bool(theme["upper"]))
+        finally:
+            self._applying = False
+        self._changed()
+        self._say(f"Theme: {name} — tweak any control to make it your own")
 
     def _save_settings(self):
         if not self._ready:
@@ -254,19 +286,36 @@ class Shortify(Gtk.Window):
         r.pack_start(self.editinfo, False, False, 0)
         r.pack_start(Gtk.Separator(), False, False, 2)
 
-        self.sliders = {}
-        for key, label, lo, hi, step in (
-                ("fontscale",   "SIZE",   0.030, 0.090, 0.002),
-                ("marginscale", "HEIGHT", 0.060, 0.300, 0.005),
-                ("offset",      "NUDGE", -0.300, 0.600, 0.010)):
+        trow = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        tl = klass(Gtk.Label(label="THEME", xalign=0), "sf-label")
+        tl.set_size_request(54, -1)
+        self.themes = self._load_themes()
+        self.themebox = Gtk.ComboBoxText()
+        self.themebox.append_text("— custom —")
+        for name in self.themes:
+            self.themebox.append_text(name)
+        self.themebox.set_active(0)
+        self.themebox.connect("changed", self._theme_picked)
+        trow.pack_start(tl, False, False, 0)
+        trow.pack_start(self.themebox, True, True, 0)
+        r.pack_start(trow, False, False, 0)
+
+        self.sliders, self.slabels = {}, {}
+        for key, label, lo, hi, step, fmt in (
+                ("fontscale",   "SIZE",    0.030, 0.090, 0.002, "{:.3f}"),
+                ("marginscale", "HEIGHT",  0.060, 0.300, 0.005, "{:.3f}"),
+                ("offset",      "NUDGE",  -0.300, 0.600, 0.010, "{:+.2f}s"),
+                ("boxradius",   "RADIUS",  0,     100,   1,     "{:.0f}%"),
+                ("boxopacity",  "OPACITY", 0,     100,   1,     "{:.0f}%")):
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             lab = klass(Gtk.Label(label=label, xalign=0), "sf-label")
             lab.set_size_request(54, -1)
-            vl = klass(Gtk.Label(label=f"{self.cfgv[key]:.3f}", xalign=1), "sf-value")
-            vl.set_size_request(46, -1)
+            vl = klass(Gtk.Label(label=fmt.format(self.cfgv[key]), xalign=1), "sf-value")
+            vl.set_size_request(52, -1)
             sc = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, lo, hi, step)
             sc.set_value(self.cfgv[key]); sc.set_draw_value(False)
-            sc.connect("value-changed", self._slider_moved, key, vl)
+            sc.connect("value-changed", self._slider_moved, key, vl, fmt)
+            self.slabels[key] = (vl, fmt)
             row.pack_start(lab, False, False, 0)
             row.pack_start(sc, True, True, 0)
             row.pack_start(vl, False, False, 0)
@@ -341,7 +390,7 @@ class Shortify(Gtk.Window):
         self.btn_fix.set_sensitive(False)
         b.pack_end(self.btn_fix, False, False, 0)
 
-        self.btn_burn = klass(Gtk.Button(label="Burn && Save"), "sf-btn", "sf-primary")
+        self.btn_burn = klass(Gtk.Button(label="Burn & Save"), "sf-btn", "sf-primary")
         self.btn_burn.set_tooltip_text("Render the captions into a new video file "
                                        "at the SAVE TO location")
         self.btn_burn.connect("clicked", lambda *_: self._burn_or_cancel())
@@ -368,10 +417,14 @@ class Shortify(Gtk.Window):
         self.btn_tr.set_sensitive(not busy and self.video is not None)
         self.btn_burn.set_sensitive(bool(self.words) or busy)
         self.btn_fix.set_sensitive(not busy and bool(self.originals))
-        self.btn_burn.set_label("Cancel" if busy and self.proc else "Burn && Save")
+        self.btn_burn.set_label("Cancel" if busy and self.proc else "Burn & Save")
 
     def _keys(self, _w, ev):
-        if self.edit.has_focus():
+        # arrows belong to whatever control has focus -- a combo, slider or entry
+        # must not have its keys stolen to walk the word list
+        focus = self.get_focus()
+        if isinstance(focus, (Gtk.Entry, Gtk.ComboBox, Gtk.Scale, Gtk.Button,
+                              Gtk.SpinButton, Gtk.ColorButton, Gtk.FontButton)):
             return False
         name = Gdk.keyval_name(ev.keyval)
         if name in ("Down", "Right") and self.words:
@@ -602,6 +655,8 @@ class Shortify(Gtk.Window):
                     textcolor=hex_of(self.colors["textcolor"].get_rgba()),
                     bordercolor=hex_of(self.colors["bordercolor"].get_rgba()),
                     boxcolor=hex_of(self.colors["boxcolor"].get_rgba()),
+                    boxradius=self.sliders["boxradius"].get_value(),
+                    boxopacity=self.sliders["boxopacity"].get_value(),
                     font=fam, upper=self.caps.get_active(),
                     sample=self.cfgv.get("sample", "Sri Lanka"))
 
@@ -612,8 +667,10 @@ class Shortify(Gtk.Window):
         return s
 
     def _reset_style(self):
-        for k in ("fontscale", "marginscale", "offset"):
+        for k in ("fontscale", "marginscale", "offset", "boxradius", "boxopacity"):
             self.sliders[k].set_value(DEFAULTS[k])
+            vl, fmt = self.slabels[k]
+            vl.set_text(fmt.format(DEFAULTS[k]))
         for k in ("textcolor", "bordercolor", "boxcolor"):
             self.colors[k].set_rgba(rgba_of(DEFAULTS[k]))
         self.fontbtn.set_font(DEFAULTS["font"] + " 12")
@@ -622,11 +679,13 @@ class Shortify(Gtk.Window):
         self._say("Style reset to defaults")
 
     def _changed(self):
+        if getattr(self, "_applying", False):
+            return
         self._save_settings()
         self._queue_preview()
 
-    def _slider_moved(self, sc, key, label):
-        label.set_text(f"{sc.get_value():.3f}")
+    def _slider_moved(self, sc, key, label, fmt="{:.3f}"):
+        label.set_text(fmt.format(sc.get_value()))
         if key == "offset":
             self.ribbon.set_offset(sc.get_value())
         self._changed()

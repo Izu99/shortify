@@ -56,7 +56,10 @@ ledger, adjust the style while watching the preview, then press **Burn & Save**.
   sliders do something visible from the moment a file is loaded — type any word to try it
 - **Save location** is shown and editable before you render — change it inline or via Browse
 - **Play** opens the captioned file once it exists, the original before that
+- **Themes** — ten presets (Highlight, Rounded, Pill, Outline only, Glass, Alert, Mint,
+  Ink, Sky, Subtitle). Picking one sets every control at once; tweak from there
 - **Colours** for letter fill, letter outline and box are set independently
+- **Corner radius and box opacity**, from a sharp block to a translucent pill
 - **Font** picker covers anything installed on the system
 - **Arrow keys** walk the word list; **Enter** saves a correction and jumps to the next word
 - **Amber chips** flag words whose timing looks wrong — under 0.1 s or over 1.6 s
@@ -77,8 +80,21 @@ python3 shortify.py video.mp4 --reuse --boxcolor 00E5FF --fontscale 0.045
 | `--boxcolor` | `FFD400` | Box fill, hex RGB |
 | `--textcolor` | `FFFFFF` | Letter fill, hex RGB |
 | `--bordercolor` | `000000` | Letter outline, hex RGB |
+| `--boxradius` | `0` | Corner rounding, 0–100% of half the box height (100 = pill) |
+| `--boxopacity` | `100` | Box opacity, 0–100% (0 hides the box, leaving outlined text) |
 | `--no-upper` | off | Keep original case instead of ALL CAPS |
 | `--reuse` | off | Reuse the cached transcript — restyle in seconds |
+
+## Themes
+
+![themes](docs/themes.png)
+
+`themes.json` holds the presets. Each entry sets any of `boxcolor`, `textcolor`,
+`bordercolor`, `boxradius`, `boxopacity`, `fontscale`, `marginscale`, `font` and `upper`.
+Add your own by editing the file — the picker reads it at startup.
+
+Rounded corners are drawn as a real ASS shape sized to the measured text, because libass's
+opaque-box border style can only produce a sharp rectangle.
 
 ## Getting names right
 
