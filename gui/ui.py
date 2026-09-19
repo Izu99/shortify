@@ -15,7 +15,7 @@ from ribbon import Ribbon
 CONFIG = Path(os.path.expanduser("~/.config/shortify/settings.json"))
 DEFAULTS = dict(fontscale=0.050, marginscale=0.135, offset=0.100,
                 boxcolor="FFD400", textcolor="FFFFFF", bordercolor="000000",
-                font="Ubuntu Sans", upper=True)
+                font="Ubuntu Sans", upper=True, sample="Sri Lanka")
 
 SHORT_WORD = 0.10      # below this, timing is probably a glitch
 LONG_WORD  = 1.60      # above this, the caption hangs
@@ -95,6 +95,7 @@ class Shortify(Gtk.Window):
         self.busy = False
         self.proc = None
         self.cur = -1
+        self._ready = False
         self.tmp = Path(tempfile.mkdtemp(prefix="shortify-"))
         self.cfgv = self._load_settings()
 
@@ -113,6 +114,7 @@ class Shortify(Gtk.Window):
         self.connect("destroy", self._quit)
         self.connect("key-press-event", self._keys)
         self.stack.set_visible_child_name("empty")
+        self._ready = True          # widgets all exist; signals may now persist state
 
     # ---------- settings ----------
     def _load_settings(self):
@@ -124,6 +126,8 @@ class Shortify(Gtk.Window):
         return v
 
     def _save_settings(self):
+        if not self._ready:
+            return
         try:
             CONFIG.parent.mkdir(parents=True, exist_ok=True)
             json.dump(self._style(), open(CONFIG, "w"), indent=1)
@@ -227,13 +231,16 @@ class Shortify(Gtk.Window):
         cols = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
 
         r = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        r.pack_start(klass(Gtk.Label(label="SELECTED WORD", xalign=0), "sf-label"), False, False, 0)
+        self.editlabel = klass(Gtk.Label(label="SAMPLE WORD", xalign=0), "sf-label")
+        r.pack_start(self.editlabel, False, False, 0)
         self.edit = klass(Gtk.Entry(), "sf-edit")
-        self.edit.set_placeholder_text("click a chip in the ribbon")
+        self.edit.set_placeholder_text("type a word to preview the style")
+        self.edit.set_text(self.cfgv.get("sample", "Sri Lanka"))
         self.edit.connect("activate", lambda *_: self._commit(advance=True))
+        self.edit.connect("changed", self._edit_changed)
         r.pack_start(self.edit, False, False, 0)
-        self.editinfo = klass(Gtk.Label(label="Enter saves, then jumps to the next word",
-                                        xalign=0), "sf-time")
+        self.editinfo = klass(Gtk.Label(label="a stand-in so you can set the style "
+                                              "before transcribing", xalign=0), "sf-time")
         r.pack_start(self.editinfo, False, False, 0)
         r.pack_start(Gtk.Separator(), False, False, 2)
 
@@ -406,6 +413,9 @@ class Shortify(Gtk.Window):
             self._say(f"Cannot read that file: {e}", "sf-status-fail")
             return
         self.filelbl.set_text(os.path.basename(path))
+        self.editlabel.set_text("SAMPLE WORD")
+        self.editinfo.set_text("a stand-in so you can set the style before transcribing")
+        self.edit.set_text(self.cfgv.get("sample", "Sri Lanka"))
         self.outpath.set_text(str(Path(path).with_suffix("")) + "-captioned.mp4")
         self.stack.set_visible_child_name("work")
         self.ribbon.load([], self.duration)
@@ -473,6 +483,7 @@ class Shortify(Gtk.Window):
         self.list.show_all()
         self.ribbon.load(self.words, self.duration, self.sliders["offset"].get_value())
         self.progress.set_fraction(1.0)
+        self.editlabel.set_text("SELECTED WORD")
         self._lock(False)
         odd = sum(1 for w in self.words if w.get("drift"))
         note = f" · {odd} with odd timing (amber)" if odd else ""
@@ -541,6 +552,13 @@ class Shortify(Gtk.Window):
             self.edit.grab_focus()
             self.edit.select_region(0, -1)
 
+    def _edit_changed(self, _e):
+        """Before a transcript exists the box drives the sample word, not a correction."""
+        if not self.words:
+            self.cfgv["sample"] = self.edit.get_text()
+            self._save_settings()
+            self._queue_preview()
+
     def _save_fixes(self):
         path = ROOT / "fixes.txt"
         pairs = [(self.originals[i], self.words[i]["text"])
@@ -568,7 +586,8 @@ class Shortify(Gtk.Window):
                     textcolor=hex_of(self.colors["textcolor"].get_rgba()),
                     bordercolor=hex_of(self.colors["bordercolor"].get_rgba()),
                     boxcolor=hex_of(self.colors["boxcolor"].get_rgba()),
-                    font=fam, upper=self.caps.get_active())
+                    font=fam, upper=self.caps.get_active(),
+                    sample=self.cfgv.get("sample", "Sri Lanka"))
 
     def _cfg(self):
         s = self._style()
@@ -606,20 +625,23 @@ class Shortify(Gtk.Window):
         self._pv_id = None
         if not self.video or self.busy:
             return False
+        off = self.sliders["offset"].get_value()
         if self.words and 0 <= self.cur < len(self.words):
             w = self.words[self.cur]
-            t = (w["start"] + w["end"]) / 2 + self.sliders["offset"].get_value()
+            t = (w["start"] + w["end"]) / 2 + off
+            words = self.words
         else:
             t = min(1.0, self.duration / 2)
+            txt = self.edit.get_text().strip() or "Sri Lanka"
+            # placed so it straddles t *after* build_ass applies the offset
+            words = [{"start": t - 0.4 - off, "end": t + 0.4 - off, "text": txt}]
 
         def work():
             try:
                 png = str(self.tmp / "pv.png")
-                vf = "scale=200:-1"
-                if self.words:
-                    assf = str(self.tmp / "pv.ass")
-                    open(assf, "w").write(engine.build_ass(self.words, self.W, self.H, self._cfg()))
-                    vf = f"ass={assf},scale=200:-1"
+                assf = str(self.tmp / "pv.ass")
+                open(assf, "w").write(engine.build_ass(words, self.W, self.H, self._cfg()))
+                vf = f"ass={assf},scale=200:-1"
                 subprocess.run(["ffmpeg", "-y", "-v", "error", "-copyts", "-ss", f"{t:.2f}",
                                 "-i", self.video, "-frames:v", "1", "-vf", vf, png],
                                check=True, timeout=60)
