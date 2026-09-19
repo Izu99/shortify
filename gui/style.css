@@ -180,3 +180,28 @@ button.sf-primary:disabled { background: @rule; color: @ink_faint; }
   color: @ink_dim;
 }
 .sf-drop-sub { font-size: 12px; color: @ink_faint; }
+
+/* ---------- save strip ---------- */
+
+.sf-save {
+  background: @ground_raised;
+  border-top: 1px solid @rule;
+  padding: 8px 18px;
+}
+
+entry.sf-path {
+  background: @ground_sunk;
+  color: @ink_dim;
+  border: 1px solid @rule;
+  border-radius: 2px;
+  font-family: "Ubuntu Mono", "DejaVu Sans Mono", monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+entry.sf-path:focus { border-color: @signal_dim; color: @ink; }
+
+/* timing that looks wrong — functional, matches the ribbon's amber chip */
+.sf-time-drift { color: @drift; }
+
+colorbutton button { padding: 2px; border-radius: 2px; min-height: 22px; }
+fontbutton button  { padding: 2px 6px; border-radius: 4px; }

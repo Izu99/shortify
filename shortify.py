@@ -153,9 +153,10 @@ def build_ass(words, W, H, cfg):
     bord    = max(2, int(fs * 0.10))     # black outline around the letters
     pad     = max(4, int(fs * 0.16))     # yellow box padding
     marginv = cfg["marginv"] or int(H * cfg["marginscale"])
-    white   = ass_color("FFFFFF")
-    black   = ass_color("000000")
-    yellow  = ass_color(cfg["boxcolor"])
+    textc   = ass_color(cfg.get("textcolor", "FFFFFF"))
+    borderc = ass_color(cfg.get("bordercolor", "000000"))
+    boxc    = ass_color(cfg["boxcolor"])
+    shadowc = ass_color("000000")
     font    = cfg["font"]
 
     head = f"""[Script Info]
@@ -168,8 +169,8 @@ YCbCr Matrix: TV.709
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Box,{font},{fs},{white},{white},{yellow},{black},-1,0,0,0,100,100,0,0,3,{pad},0,2,40,40,{marginv},1
-Style: Text,{font},{fs},{white},{white},{black},{black},-1,0,0,0,100,100,0,0,1,{bord},0,2,40,40,{marginv},1
+Style: Box,{font},{fs},{textc},{textc},{boxc},{shadowc},-1,0,0,0,100,100,0,0,3,{pad},0,2,40,40,{marginv},1
+Style: Text,{font},{fs},{textc},{textc},{borderc},{shadowc},-1,0,0,0,100,100,0,0,1,{bord},0,2,40,40,{marginv},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -227,7 +228,9 @@ def main():
     p.add_argument("--offset", type=float, default=0.10,
                    help="shift all captions later by N seconds to match the voice")
     p.add_argument("--marginv", type=int, default=0)
-    p.add_argument("--boxcolor", default="FFD400")
+    p.add_argument("--boxcolor", default="FFD400", help="box fill, hex RGB")
+    p.add_argument("--textcolor", default="FFFFFF", help="letter fill, hex RGB")
+    p.add_argument("--bordercolor", default="000000", help="letter outline, hex RGB")
     p.add_argument("--hold", type=float, default=0.35)
     p.add_argument("--min-dur", type=float, default=0.18, dest="min_dur")
     p.add_argument("--pop-from", type=int, default=55, dest="pop_from")

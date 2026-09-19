@@ -15,6 +15,7 @@ INK_FAINT   = (0.388, 0.439, 0.498)
 INK_DARK    = (0.078, 0.063, 0.020)
 SIGNAL      = (1.000, 0.831, 0.000)
 EDITED      = (0.353, 0.820, 0.604)
+DRIFT       = (0.847, 0.651, 0.341)
 
 CHIP_H   = 30
 RULER_H  = 14
@@ -119,7 +120,12 @@ class Ribbon(Gtk.DrawingArea):
                 continue
             x += 1.0
             w = max(2.0, w - 2.0)      # hairline gap: chips must read as separate
-            col = EDITED if wd.get("edited") else SIGNAL
+            if wd.get("edited"):
+                col = EDITED
+            elif wd.get("drift"):
+                col = DRIFT
+            else:
+                col = SIGNAL
             if i == self.selected:
                 cr.set_source_rgb(*col)
                 cr.rectangle(x - 2, top - 3, w + 4, CHIP_H + 6)

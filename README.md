@@ -38,7 +38,15 @@ sudo apt install ffmpeg python3-gi python3-gi-cairo gir1.2-gtk-3.0 cmake build-e
 ## Use
 
 **App** — `python3 gui/ui.py`, then drag a video in. Transcribe, fix any wrong words in the
-ledger, adjust the sliders while watching the preview, hit Burn.
+ledger, adjust the style while watching the preview, hit Burn.
+
+- **Save location** is shown and editable before you render — change it inline or via Browse
+- **Play** opens the captioned file once it exists, the original before that
+- **Colours** for letter fill, letter outline and box are set independently
+- **Font** picker covers anything installed on the system
+- **Arrow keys** walk the word list; **Enter** saves a correction and jumps to the next word
+- **Amber chips** flag words whose timing looks wrong — under 0.1 s or over 1.6 s
+- **Burn is cancellable**, and every style setting persists to `~/.config/shortify/settings.json`
 
 **Command line** — same engine, no window:
 
@@ -52,7 +60,9 @@ python3 shortify.py video.mp4 --reuse --boxcolor 00E5FF --fontscale 0.045
 | `--fontscale` | `0.050` | Text height as a fraction of frame height |
 | `--marginscale` | `0.135` | Distance off the bottom, same units |
 | `--offset` | `0.10` | Shift every caption later, in seconds |
-| `--boxcolor` | `FFD400` | Box colour, hex RGB |
+| `--boxcolor` | `FFD400` | Box fill, hex RGB |
+| `--textcolor` | `FFFFFF` | Letter fill, hex RGB |
+| `--bordercolor` | `000000` | Letter outline, hex RGB |
 | `--no-upper` | off | Keep original case instead of ALL CAPS |
 | `--reuse` | off | Reuse the cached transcript — restyle in seconds |
 
