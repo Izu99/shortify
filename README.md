@@ -48,7 +48,9 @@ sudo apt install ffmpeg python3-gi python3-gi-cairo gir1.2-gtk-3.0 cmake build-e
 ## Use
 
 **App** — `python3 gui/ui.py`, then drag a video in. Transcribe, fix any wrong words in the
-ledger, adjust the style while watching the preview, hit Burn.
+ledger, adjust the style while watching the preview, then press **Burn & Save**.
+
+`Browse…` only chooses *where* the file goes — **Burn & Save** is what renders it.
 
 - **Sample word** renders your style onto the video before you transcribe anything, so the
   sliders do something visible from the moment a file is loaded — type any word to try it

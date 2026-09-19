@@ -229,7 +229,7 @@ class Shortify(Gtk.Window):
         self.btn_play.set_label("▶  Play result" if done else "▶  Play source")
         self.btn_play.set_tooltip_text(
             out if done else "Not rendered yet — this opens the original. "
-                             "Press Burn captions to create the captioned file.")
+                             "Press Burn & Save to create the captioned file.")
         ctx = self.btn_play.get_style_context()
         ctx.add_class("sf-primary") if done else ctx.remove_class("sf-primary")
 
@@ -341,7 +341,9 @@ class Shortify(Gtk.Window):
         self.btn_fix.set_sensitive(False)
         b.pack_end(self.btn_fix, False, False, 0)
 
-        self.btn_burn = klass(Gtk.Button(label="Burn captions"), "sf-btn", "sf-primary")
+        self.btn_burn = klass(Gtk.Button(label="Burn && Save"), "sf-btn", "sf-primary")
+        self.btn_burn.set_tooltip_text("Render the captions into a new video file "
+                                       "at the SAVE TO location")
         self.btn_burn.connect("clicked", lambda *_: self._burn_or_cancel())
         self.btn_burn.set_sensitive(False)
         b.pack_end(self.btn_burn, False, False, 0)
@@ -366,7 +368,7 @@ class Shortify(Gtk.Window):
         self.btn_tr.set_sensitive(not busy and self.video is not None)
         self.btn_burn.set_sensitive(bool(self.words) or busy)
         self.btn_fix.set_sensitive(not busy and bool(self.originals))
-        self.btn_burn.set_label("Cancel" if busy and self.proc else "Burn captions")
+        self.btn_burn.set_label("Cancel" if busy and self.proc else "Burn && Save")
 
     def _keys(self, _w, ev):
         if self.edit.has_focus():
@@ -437,10 +439,10 @@ class Shortify(Gtk.Window):
 
     # ---------- output ----------
     def _browse_out(self):
-        d = Gtk.FileChooserDialog(title="Save captioned video as", parent=self,
-                                  action=Gtk.FileChooserAction.SAVE)
-        d.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                      Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+        d = Gtk.FileChooserDialog(title="Where should the captioned video go?",
+                                  parent=self, action=Gtk.FileChooserAction.SAVE)
+        d.add_buttons("Cancel", Gtk.ResponseType.CANCEL,
+                      "Set location", Gtk.ResponseType.OK)
         cur = self.outpath.get_text().strip()
         if cur:
             d.set_current_folder(str(Path(cur).parent))
@@ -448,6 +450,7 @@ class Shortify(Gtk.Window):
         d.set_do_overwrite_confirmation(True)
         if d.run() == Gtk.ResponseType.OK:
             self.outpath.set_text(d.get_filename())
+            self._say("Location set — now press Burn & Save to render the video")
         d.destroy()
 
     def _play(self):
@@ -499,7 +502,8 @@ class Shortify(Gtk.Window):
         self._lock(False)
         odd = sum(1 for w in self.words if w.get("drift"))
         note = f" · {odd} with odd timing (amber)" if odd else ""
-        self._say(f"{len(self.words)} words{note} — arrow keys walk the list, Enter saves a fix")
+        self._say(f"{len(self.words)} words{note} — fix any wrong word, "
+                  f"then press Burn & Save")
         if self.words:
             self._pick(0)
 
@@ -734,7 +738,7 @@ class Shortify(Gtk.Window):
         self._lock(False)
         mb = os.path.getsize(out) / 1e6
         self._refresh_play()
-        self._say(f"Saved {out}  ({mb:.0f} MB) — press Play result to watch")
+        self._say(f"Saved to {out}  ({mb:.0f} MB) — press Play result to watch")
 
 
 def main():
