@@ -216,12 +216,22 @@ class Shortify(Gtk.Window):
         br = klass(Gtk.Button(label="Browse…"), "sf-btn")
         br.connect("clicked", lambda *_: self._browse_out())
         b.pack_start(br, False, False, 0)
-        self.btn_play = klass(Gtk.Button(label="▶  Play"), "sf-btn")
-        self.btn_play.set_tooltip_text("Play the captioned file once it exists, "
-                                       "otherwise the original")
+        self.btn_play = klass(Gtk.Button(label="▶  Play source"), "sf-btn")
         self.btn_play.connect("clicked", lambda *_: self._play())
         b.pack_start(self.btn_play, False, False, 0)
+        self.outpath.connect("changed", lambda *_: self._refresh_play())
         return b
+
+    def _refresh_play(self):
+        """Say which file Play will open, so a missing render is obvious."""
+        out = self.outpath.get_text().strip()
+        done = bool(out) and os.path.exists(out)
+        self.btn_play.set_label("▶  Play result" if done else "▶  Play source")
+        self.btn_play.set_tooltip_text(
+            out if done else "Not rendered yet — this opens the original. "
+                             "Press Burn captions to create the captioned file.")
+        ctx = self.btn_play.get_style_context()
+        ctx.add_class("sf-primary") if done else ctx.remove_class("sf-primary")
 
     def _panel(self):
         """Preview sits beside the controls — the laptop panel is only 768px tall."""
@@ -421,6 +431,7 @@ class Shortify(Gtk.Window):
         self.ribbon.load([], self.duration)
         self._lock(False)
         self.btn_burn.set_sensitive(False)
+        self._refresh_play()
         self._say(f"{self.W}×{self.H} · {self.duration:.0f}s — press Transcribe")
         self._queue_preview()
 
@@ -445,10 +456,11 @@ class Shortify(Gtk.Window):
         if not target or not os.path.exists(target):
             self._say("Nothing to play yet", "sf-status-fail")
             return
+        which = "captioned" if target == out else "ORIGINAL (not rendered yet)"
         try:
             subprocess.Popen(["xdg-open", target],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            self._say(f"Playing {os.path.basename(target)}")
+            self._say(f"Opening the {which}: {os.path.basename(target)}")
         except Exception as e:
             self._say(f"Could not open player: {e}", "sf-status-fail")
 
@@ -721,7 +733,8 @@ class Shortify(Gtk.Window):
         self.proc = None
         self._lock(False)
         mb = os.path.getsize(out) / 1e6
-        self._say(f"Saved {out}  ({mb:.0f} MB) — press Play to watch")
+        self._refresh_play()
+        self._say(f"Saved {out}  ({mb:.0f} MB) — press Play result to watch")
 
 
 def main():
